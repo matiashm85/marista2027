@@ -6,7 +6,6 @@
 <title>Fiesta Maristas 2027 · Estado financiero</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
     --bg:       #f9f9f7;
     --surface:  #ffffff;
@@ -22,172 +21,200 @@
     --blue-bg:  #e6f1fb;
     --amber:    #854f0b;
     --amber-bg: #faeeda;
+    --purple:   #534ab7;
+    --purple-bg:#eeedfe;
     --radius:   10px;
-    --shadow:   0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
   }
-
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    font-size: 14px;
-    line-height: 1.5;
-    min-height: 100vh;
+    background: var(--bg); color: var(--text);
+    font-size: 14px; line-height: 1.5; min-height: 100vh;
   }
 
-  /* ── Header ─────────────────────────────────── */
+  /* Header */
   header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 18px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 24px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 10;
   }
-  .header-left { display: flex; align-items: center; gap: 12px; }
-  .header-icon {
-    width: 38px; height: 38px; border-radius: 50%;
-    background: var(--green-bg);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
+  .header-left  { display: flex; align-items: center; gap: 12px; }
+  .header-icon  {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--green-bg); display: flex; align-items: center;
+    justify-content: center; font-size: 17px;
   }
-  .header-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .header-title { font-size: 15px; font-weight: 600; }
   .header-sub   { font-size: 12px; color: var(--muted); }
-  .btn-refresh {
+  .btn-refresh  {
     font-size: 12px; padding: 6px 14px; border-radius: 6px;
     border: 1px solid var(--border); background: var(--surface);
     color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 6px;
-    transition: background .15s;
   }
   .btn-refresh:hover { background: var(--bg); }
 
-  /* ── Main layout ─────────────────────────────── */
-  main { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
+  /* Layout */
+  main { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
 
-  /* ── KPI cards ───────────────────────────────── */
+  /* KPI grid */
   .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-    margin-bottom: 28px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 24px;
   }
   .kpi {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    box-shadow: var(--shadow);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
   }
   .kpi-label {
     font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 5px;
   }
-  .kpi-icon { font-size: 14px; }
-  .kpi-value { font-size: 24px; font-weight: 600; }
-  .kpi-value.ing  { color: var(--green); }
-  .kpi-value.gas  { color: var(--red); }
-  .kpi-value.pos  { color: var(--blue); }
-  .kpi-value.neg  { color: var(--red); }
-  .kpi-sub { font-size: 11px; color: var(--hint); margin-top: 4px; }
+  .kpi-value { font-size: 22px; font-weight: 600; }
+  .kpi-value.ing    { color: var(--green); }
+  .kpi-value.gas    { color: var(--red); }
+  .kpi-value.pagado { color: var(--amber); }
+  .kpi-value.pos    { color: var(--blue); }
+  .kpi-value.neg    { color: var(--red); }
+  .kpi-sub { font-size: 11px; color: var(--hint); margin-top: 3px; }
 
-  /* ── Progress ────────────────────────────────── */
+  /* Progress */
   .progress-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    margin-bottom: 28px;
-    box-shadow: var(--shadow);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 28px;
   }
-  .progress-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .progress-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 7px; }
   .progress-track { height: 6px; background: var(--bg); border-radius: 99px; overflow: hidden; }
-  .progress-fill  { height: 100%; background: var(--green); border-radius: 99px; transition: width .6s ease; }
-  .progress-foot  { display: flex; justify-content: space-between; font-size: 11px; color: var(--hint); margin-top: 6px; }
+  .progress-fill  { height: 100%; background: var(--green); border-radius: 99px; transition: width .6s; }
+  .progress-foot  { display: flex; justify-content: space-between; font-size: 11px; color: var(--hint); margin-top: 5px; }
 
-  /* ── Sections ────────────────────────────────── */
-  .section-label {
+  /* Section */
+  .section        { margin-bottom: 32px; }
+  .section-label  {
     font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
     color: var(--muted); margin-bottom: 10px; font-weight: 500;
   }
-  .section { margin-bottom: 32px; }
 
-  /* ── Table ───────────────────────────────────── */
-  .table-wrap {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: var(--shadow);
+  /* Grupo de ingresos */
+  .grupo {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 12px;
   }
-  table { width: 100%; border-collapse: collapse; }
-  thead th {
+  .grupo-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 16px; background: var(--bg);
+    border-bottom: 1px solid var(--border); cursor: pointer;
+    user-select: none;
+  }
+  .grupo-header:hover { background: #f3f2ef; }
+  .grupo-titulo { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .grupo-badge  {
+    font-size: 10px; padding: 2px 8px; border-radius: 99px;
+    background: var(--green-bg); color: var(--green); font-weight: 500;
+  }
+  .grupo-total  { font-size: 14px; font-weight: 600; color: var(--green); }
+  .grupo-arrow  { font-size: 11px; color: var(--muted); margin-left: 12px; transition: transform .2s; }
+  .grupo-arrow.open { transform: rotate(180deg); }
+  .grupo-body   { display: none; }
+  .grupo-body.open { display: block; }
+
+  /* Tabla ingresos (sin links) */
+  .ing-table { width: 100%; border-collapse: collapse; }
+  .ing-table th {
     text-align: left; font-size: 11px; text-transform: uppercase;
-    letter-spacing: .05em; color: var(--muted); font-weight: 500;
-    padding: 10px 14px; background: var(--bg);
-    border-bottom: 1px solid var(--border);
+    letter-spacing: .04em; color: var(--muted); font-weight: 500;
+    padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--border);
   }
-  thead th.right { text-align: right; }
-  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
-  tbody tr:last-child { border-bottom: none; }
-  tbody tr:hover { background: #fafaf8; }
-  td { padding: 10px 14px; vertical-align: middle; }
-  td.right { text-align: right; }
+  .ing-table th.right { text-align: right; }
+  .ing-table td { padding: 9px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .ing-table td.right { text-align: right; }
+  .ing-table tr:last-child td { border-bottom: none; }
+  .ing-table tr:hover td { background: #fafaf8; }
+  .ing-monto { font-weight: 600; color: var(--green); white-space: nowrap; }
 
-  .partner { font-weight: 500; color: var(--text); }
-  .fecha   { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  .monto-ing { font-weight: 600; color: var(--green); white-space: nowrap; }
-  .monto-gas { font-weight: 600; color: var(--red);   white-space: nowrap; }
+  /* Tabla gastos */
+  .gas-table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .gas-item { border-bottom: 1px solid var(--border); }
+  .gas-item:last-child { border-bottom: none; }
+  .gas-item-header {
+    display: grid; grid-template-columns: 1fr auto;
+    padding: 12px 16px 6px; gap: 8px;
+  }
+  .gas-nombre { font-weight: 500; font-size: 14px; }
+  .gas-comprobante { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .gas-montos {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    padding: 6px 16px 12px; gap: 8px; border-top: 1px solid var(--border);
+    background: var(--bg); margin-top: 8px;
+  }
+  .gas-monto-item { text-align: center; }
+  .gas-monto-label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 3px; }
+  .gas-monto-value { font-size: 14px; font-weight: 600; }
+  .gas-monto-value.total  { color: var(--red); }
+  .gas-monto-value.pagado { color: var(--amber); }
+  .gas-monto-value.saldo  { color: var(--blue); }
+  .gas-monto-value.saldo-cero { color: var(--green); }
 
+  /* Pagos de proveedor */
+  .pagos-titulo {
+    font-size: 11px; color: var(--muted); padding: 6px 16px 4px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .pago-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 16px; font-size: 12px; border-top: 1px solid var(--border);
+  }
+  .pago-row:hover { background: #fafaf8; }
+  .pago-ref  { color: var(--muted); }
+  .pago-fecha { color: var(--hint); font-size: 11px; margin-left: 8px; }
+  .pago-monto { font-weight: 500; color: var(--amber); white-space: nowrap; }
+  .pago-link  {
+    font-size: 11px; color: var(--blue); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 3px; margin-left: 10px;
+  }
+  .pago-link:hover { text-decoration: underline; }
+
+  /* Badge estado */
   .badge {
-    font-size: 10px; padding: 2px 7px; border-radius: 99px;
-    font-weight: 500; white-space: nowrap;
+    font-size: 10px; padding: 2px 7px; border-radius: 99px; font-weight: 500;
   }
   .badge-paid    { background: var(--green-bg); color: var(--green); }
-  .badge-pending { background: var(--amber-bg); color: var(--amber); }
+  .badge-partial { background: var(--amber-bg); color: var(--amber); }
+  .badge-pending { background: var(--red-bg);   color: var(--red); }
 
-  .link-comp {
-    font-size: 11px; color: var(--blue);
-    text-decoration: none; display: inline-flex; align-items: center; gap: 3px;
+  /* Link externo */
+  .ext-link {
+    font-size: 11px; color: var(--blue); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 3px;
   }
-  .link-comp:hover { text-decoration: underline; }
-  .link-comp svg { width: 10px; height: 10px; flex-shrink: 0; }
+  .ext-link:hover { text-decoration: underline; }
 
-  /* ── Status / error ──────────────────────────── */
-  .status-msg {
-    text-align: center; padding: 32px; color: var(--muted); font-size: 13px;
-  }
-  .error-msg {
+  /* Misc */
+  .status-msg { text-align: center; padding: 28px; color: var(--muted); font-size: 13px; }
+  .error-msg  {
     background: var(--red-bg); color: var(--red);
-    border-radius: var(--radius); padding: 14px 18px;
+    border-radius: var(--radius); padding: 12px 16px;
     font-size: 13px; margin-bottom: 20px;
   }
-
-  /* ── Timestamp ───────────────────────────────── */
-  .timestamp { font-size: 11px; color: var(--hint); text-align: right; margin-bottom: 18px; }
-
-  /* ── Spinner ─────────────────────────────────── */
+  .timestamp  { font-size: 11px; color: var(--hint); text-align: right; margin-bottom: 16px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .spinner {
-    width: 18px; height: 18px; border: 2px solid var(--border);
+    width: 16px; height: 16px; border: 2px solid var(--border);
     border-top-color: var(--green); border-radius: 50%;
     animation: spin .7s linear infinite; display: inline-block;
   }
 
-  /* ── Responsive ──────────────────────────────── */
   @media (max-width: 600px) {
     .kpi-grid { grid-template-columns: 1fr 1fr; }
-    .kpi-value { font-size: 20px; }
-    thead th.hide-mobile, td.hide-mobile { display: none; }
-    main { padding: 18px 14px 40px; }
+    .gas-montos { grid-template-columns: 1fr 1fr 1fr; }
+    main { padding: 16px 12px 40px; }
   }
 </style>
 </head>
 <body>
 
-<!-- ── Header ── -->
 <header>
   <div class="header-left">
     <div class="header-icon">🎓</div>
@@ -201,30 +228,34 @@
   </button>
 </header>
 
-<!-- ── Main ── -->
 <main>
   <div id="error-box" style="display:none" class="error-msg"></div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
     <div class="kpi">
-      <div class="kpi-label"><span class="kpi-icon">↑</span> Ingresos</div>
+      <div class="kpi-label">↑ Ingresos</div>
       <div class="kpi-value ing" id="kpi-ing">—</div>
       <div class="kpi-sub" id="kpi-ing-sub"></div>
     </div>
     <div class="kpi">
-      <div class="kpi-label"><span class="kpi-icon">↓</span> Gastos</div>
+      <div class="kpi-label">↓ Deuda total</div>
       <div class="kpi-value gas" id="kpi-gas">—</div>
       <div class="kpi-sub" id="kpi-gas-sub"></div>
     </div>
     <div class="kpi">
-      <div class="kpi-label"><span class="kpi-icon">◎</span> Saldo</div>
+      <div class="kpi-label">✓ Pagado a proveed.</div>
+      <div class="kpi-value pagado" id="kpi-pagado">—</div>
+      <div class="kpi-sub">pagos realizados</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">◎ Saldo en caja</div>
       <div class="kpi-value" id="kpi-sal">—</div>
-      <div class="kpi-sub">ingresos − gastos</div>
+      <div class="kpi-sub">ingresos − pagos</div>
     </div>
   </div>
 
-  <!-- Barra de progreso -->
+  <!-- Progreso -->
   <div class="progress-card">
     <div class="progress-meta">
       <span>Avance hacia la meta</span>
@@ -239,35 +270,25 @@
     </div>
   </div>
 
-  <!-- Timestamp -->
   <div class="timestamp" id="timestamp"></div>
 
   <!-- Ingresos -->
   <div class="section">
     <div class="section-label">Ingresos</div>
-    <div class="table-wrap">
-      <div id="tabla-ingresos"><div class="status-msg"><span class="spinner"></span></div></div>
-    </div>
+    <div id="grupos-ingresos"><div class="status-msg"><span class="spinner"></span></div></div>
   </div>
 
   <!-- Gastos -->
   <div class="section">
     <div class="section-label">Gastos</div>
-    <div class="table-wrap">
-      <div id="tabla-gastos"><div class="status-msg"><span class="spinner"></span></div></div>
-    </div>
+    <div id="lista-gastos"><div class="status-msg"><span class="spinner"></span></div></div>
   </div>
 </main>
 
 <script>
-// ── Configuración ─────────────────────────────────────────────
-// Reemplazá esta URL con la de tu Web App de Apps Script
-// después de publicarla (Implementar → Nueva implementación → Web App)
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1yhnr6kBpO7G9ld0zKV7BPmWtWbrmxHC4aahnFDKSb8rZ8FAqyoltVInpyCncyVOpeQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/library/d/1_oeiCo6wJvodEELbV65A081pVhL2F4cOJJkcn7mChV1ix0M5KhwxrxRN/4";
+const META = 50000;
 
-const META = 50000; // Meta en Bs. — ajustá según el presupuesto real
-
-// ── Formato ───────────────────────────────────────────────────
 function fmt(n) {
   return "Bs. " + Math.round(n).toLocaleString("es-BO");
 }
@@ -275,99 +296,177 @@ function fmtFecha(str) {
   if (!str) return "—";
   const [y, m, d] = str.split("-");
   const meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-  return d + " " + meses[parseInt(m) - 1] + " " + y.slice(2);
+  return d + " " + meses[parseInt(m)-1] + " " + y.slice(2);
 }
-function iconoExterno() {
-  return `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2v8h8V7M7 2h3v3M10 2L5.5 6.5"/></svg>`;
+function escHtml(s) {
+  return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function iconoExt() {
+  return `<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2v8h8V7M7 2h3v3M10 2L5.5 6.5"/></svg>`;
 }
 
-// ── Render tabla ──────────────────────────────────────────────
-function renderTabla(filas, tipo) {
-  if (!filas.length) {
-    return `<div class="status-msg">Sin registros aún</div>`;
-  }
-  const clsMonto = tipo === "ing" ? "monto-ing" : "monto-gas";
-  let html = `<table>
-    <thead>
+// ── Render ingresos agrupados ─────────────────────────────────
+function renderGruposIngresos(grupos) {
+  if (!grupos || !grupos.length) return '<div class="status-msg">Sin ingresos</div>';
+
+  return grupos.map((grupo, gi) => {
+    const items = grupo.items || [];
+    const filas = items.map(p => `
       <tr>
-        <th>Descripción</th>
-        <th class="hide-mobile">Fecha</th>
-        <th class="right">Monto</th>
-        <th class="hide-mobile">Estado</th>
-        <th class="hide-mobile right">Comprobante</th>
-      </tr>
-    </thead>
-    <tbody>`;
+        <td>${escHtml(p.nombre)}</td>
+        <td class="right ing-monto">${fmt(p.total)}</td>
+      </tr>`).join("");
 
-  filas.forEach(f => {
-    const badge = f.pagado
-      ? `<span class="badge badge-paid">Pagado</span>`
-      : `<span class="badge badge-pending">Pendiente</span>`;
-    const link = `<a href="${f.url}" target="_blank" class="link-comp">${f.comprobante} ${iconoExterno()}</a>`;
-    html += `<tr>
-      <td><span class="partner">${escHtml(f.nombre)}</span></td>
-      <td class="fecha hide-mobile">${fmtFecha(f.fecha)}</td>
-      <td class="right ${clsMonto}">${fmt(f.monto)}</td>
-      <td class="hide-mobile">${badge}</td>
-      <td class="right hide-mobile">${link}</td>
-    </tr>`;
+    const total = items.reduce((s,p) => s + p.total, 0);
+
+    return `
+    <div class="grupo">
+      <div class="grupo-header" onclick="toggleGrupo(${gi})">
+        <span class="grupo-titulo">
+          <span class="grupo-badge">${items.length} personas</span>
+          ${escHtml(grupo.nombre)}
+        </span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span class="grupo-total">${fmt(total)}</span>
+          <span class="grupo-arrow open" id="arrow-${gi}">▾</span>
+        </span>
+      </div>
+      <div class="grupo-body open" id="body-${gi}">
+        <table class="ing-table">
+          <thead>
+            <tr>
+              <th>Compañero/a</th>
+              <th class="right">Total aportado</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function toggleGrupo(gi) {
+  const body  = document.getElementById("body-" + gi);
+  const arrow = document.getElementById("arrow-" + gi);
+  body.classList.toggle("open");
+  arrow.classList.toggle("open");
+}
+
+// ── Render gastos con pagos ───────────────────────────────────
+function renderGastos(gastos, pagos) {
+  if (!gastos || !gastos.length) return '<div class="status-msg">Sin gastos</div>';
+
+  // Agrupar pagos por nombre de proveedor (aproximación)
+  const pagosPorPartner = {};
+  (pagos || []).forEach(p => {
+    const k = p.nombre;
+    if (!pagosPorPartner[k]) pagosPorPartner[k] = [];
+    pagosPorPartner[k].push(p);
   });
 
-  html += `</tbody></table>`;
-  return html;
-}
+  const filas = gastos.map(g => {
+    let badge = "";
+    if (g.pagado_bool) {
+      badge = `<span class="badge badge-paid">Pagado</span>`;
+    } else if (g.pagado_acum > 0) {
+      badge = `<span class="badge badge-partial">Parcial</span>`;
+    } else {
+      badge = `<span class="badge badge-pending">Pendiente</span>`;
+    }
 
-function escHtml(str) {
-  return (str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const saldoClass = g.saldo <= 0 ? "saldo-cero" : "saldo";
+    const pagLink = `<a href="${escHtml(g.url)}" target="_blank" class="ext-link">${escHtml(g.comprobante)} ${iconoExt()}</a>`;
+
+    // Pagos del mismo proveedor
+    const pagosDelPartner = pagosPorPartner[g.nombre] || [];
+    let pagosHtml = "";
+    if (pagosDelPartner.length) {
+      const filasPagos = pagosDelPartner.map(p => `
+        <div class="pago-row">
+          <span>
+            <span class="pago-ref">${escHtml(p.referencia)}</span>
+            <span class="pago-fecha">${fmtFecha(p.fecha)}</span>
+          </span>
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span class="pago-monto">${fmt(p.monto)}</span>
+            <a href="${escHtml(p.url)}" target="_blank" class="pago-link">${iconoExt()} ver</a>
+          </span>
+        </div>`).join("");
+      pagosHtml = `<div class="pagos-titulo">Pagos realizados</div>${filasPagos}`;
+    }
+
+    return `
+    <div class="gas-item">
+      <div class="gas-item-header">
+        <div>
+          <div class="gas-nombre">${escHtml(g.nombre)} ${badge}</div>
+          <div class="gas-comprobante">${pagLink} · ${fmtFecha(g.fecha)}</div>
+        </div>
+      </div>
+      <div class="gas-montos">
+        <div class="gas-monto-item">
+          <div class="gas-monto-label">Monto total</div>
+          <div class="gas-monto-value total">${fmt(g.monto_total)}</div>
+        </div>
+        <div class="gas-monto-item">
+          <div class="gas-monto-label">Pagado</div>
+          <div class="gas-monto-value pagado">${fmt(g.pagado_acum)}</div>
+        </div>
+        <div class="gas-monto-item">
+          <div class="gas-monto-label">Saldo</div>
+          <div class="gas-monto-value ${saldoClass}">${fmt(g.saldo)}</div>
+        </div>
+      </div>
+      ${pagosHtml}
+    </div>`;
+  }).join("");
+
+  return `<div class="gas-table-wrap">${filas}</div>`;
 }
 
 // ── Actualizar UI ─────────────────────────────────────────────
 function actualizarUI(data) {
-  const { resumen, ingresos, gastos, actualizado } = data;
+  const { resumen, grupos_ingresos, gastos, pagos, actualizado } = data;
 
-  // KPIs
-  document.getElementById("kpi-ing").textContent = fmt(resumen.total_ingresos);
+  document.getElementById("kpi-ing").textContent    = fmt(resumen.total_ingresos);
   document.getElementById("kpi-ing-sub").textContent = resumen.cant_ingresos + " registro" + (resumen.cant_ingresos !== 1 ? "s" : "");
-  document.getElementById("kpi-gas").textContent = fmt(resumen.total_gastos);
-  document.getElementById("kpi-gas-sub").textContent = resumen.cant_gastos + " registro" + (resumen.cant_gastos !== 1 ? "s" : "");
+  document.getElementById("kpi-gas").textContent    = fmt(resumen.total_gastos);
+  document.getElementById("kpi-gas-sub").textContent = resumen.cant_gastos + " factura" + (resumen.cant_gastos !== 1 ? "s" : "");
+  document.getElementById("kpi-pagado").textContent = fmt(resumen.total_pagado_gs);
 
   const salEl = document.getElementById("kpi-sal");
-  salEl.textContent = fmt(resumen.saldo);
-  salEl.className = "kpi-value " + (resumen.saldo >= 0 ? "pos" : "neg");
+  salEl.textContent  = fmt(resumen.saldo_caja);
+  salEl.className    = "kpi-value " + (resumen.saldo_caja >= 0 ? "pos" : "neg");
 
-  // Progreso
   const pct = Math.min(100, Math.round((resumen.total_ingresos / META) * 100));
   document.getElementById("progress-fill").style.width = pct + "%";
-  document.getElementById("pct-label").textContent = pct + "%";
-  document.getElementById("meta-label").textContent = "Meta: " + fmt(META);
+  document.getElementById("pct-label").textContent    = pct + "%";
+  document.getElementById("meta-label").textContent   = "Meta: " + fmt(META);
   const falta = META - resumen.total_ingresos;
-  document.getElementById("falta-label").textContent =
-    falta > 0 ? "Faltan " + fmt(falta) : "¡Meta superada!";
+  document.getElementById("falta-label").textContent  = falta > 0 ? "Faltan " + fmt(falta) : "¡Meta superada!";
 
-  // Tablas
-  document.getElementById("tabla-ingresos").innerHTML = renderTabla(ingresos, "ing");
-  document.getElementById("tabla-gastos").innerHTML   = renderTabla(gastos, "gas");
+  document.getElementById("grupos-ingresos").innerHTML = renderGruposIngresos(grupos_ingresos);
+  document.getElementById("lista-gastos").innerHTML    = renderGastos(gastos, pagos);
 
-  // Timestamp
   const d = new Date(actualizado);
   document.getElementById("timestamp").textContent =
     "Actualizado: " + d.toLocaleDateString("es-BO") + " " + d.toLocaleTimeString("es-BO");
 }
 
-// ── Fetch principal ───────────────────────────────────────────
+// ── Fetch ─────────────────────────────────────────────────────
 async function cargar() {
-  const btn = document.getElementById("btn-refresh");
+  const btn  = document.getElementById("btn-refresh");
   const icon = document.getElementById("refresh-icon");
   btn.disabled = true;
   icon.innerHTML = `<span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span>`;
   document.getElementById("error-box").style.display = "none";
-
   try {
     const resp = await fetch(APPS_SCRIPT_URL + "?t=" + Date.now());
     const json = await resp.json();
     if (!json.ok) throw new Error(json.error || "Error desconocido");
     actualizarUI(json.data);
-  } catch (e) {
+  } catch(e) {
     document.getElementById("error-box").textContent = "Error al cargar datos: " + e.message;
     document.getElementById("error-box").style.display = "block";
   } finally {
@@ -376,7 +475,6 @@ async function cargar() {
   }
 }
 
-// ── Auto-refresh cada 5 minutos ───────────────────────────────
 cargar();
 setInterval(cargar, 5 * 60 * 1000);
 </script>
