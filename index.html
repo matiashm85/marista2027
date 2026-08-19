@@ -122,15 +122,19 @@
   .ing-table tr:last-child td { border-bottom: none; }
   .ing-table tr:hover td { background: #fafaf8; }
   .ing-monto { font-weight: 600; color: var(--green); white-space: nowrap; }
+
+  /* Gastos */
   .gas-table-wrap {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); overflow: hidden;
   }
   .gas-item { border-bottom: 1px solid var(--border); }
   .gas-item:last-child { border-bottom: none; }
-  .gas-item-header { padding: 12px 16px 6px; }
-  .gas-nombre { font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-  .gas-comprobante { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .gas-item-header { padding: 12px 16px 8px; }
+  .gas-nombre { font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .gas-meta { font-size: 11px; color: var(--muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .gas-meta-item { display: flex; align-items: center; gap: 4px; }
+  .gas-meta-label { color: var(--hint); }
   .gas-montos {
     display: grid; grid-template-columns: repeat(3, 1fr);
     padding: 8px 16px 12px; gap: 8px;
@@ -207,7 +211,6 @@
 <main>
   <div id="error-box" style="display:none" class="error-msg"></div>
 
-  <!-- Fila 1: Flujo de caja -->
   <div class="kpi-section-label">Flujo de caja</div>
   <div class="kpi-row">
     <div class="kpi accent-green">
@@ -227,7 +230,6 @@
     </div>
   </div>
 
-  <!-- Fila 2: Estado con proveedores -->
   <div class="kpi-section-label">Estado con proveedores</div>
   <div class="kpi-row" style="margin-bottom:28px;">
     <div class="kpi accent-red">
@@ -247,7 +249,6 @@
     </div>
   </div>
 
-  <!-- Progreso -->
   <div class="progress-card">
     <div class="progress-meta">
       <span>Avance hacia la meta</span>
@@ -264,13 +265,11 @@
 
   <div class="timestamp" id="timestamp"></div>
 
-  <!-- Ingresos -->
   <div class="section">
     <div class="section-label">Ingresos</div>
     <div id="grupos-ingresos"><div class="status-msg"><span class="spinner"></span></div></div>
   </div>
 
-  <!-- Gastos -->
   <div class="section">
     <div class="section-label">Gastos</div>
     <div id="lista-gastos"><div class="status-msg"><span class="spinner"></span></div></div>
@@ -343,19 +342,33 @@ function toggleGrupo(gi) {
 
 function renderGastos(gastos, pagos) {
   if (!gastos || !gastos.length) return '<div class="status-msg">Sin gastos</div>';
+
   const pagosPorPartner = {};
   (pagos || []).forEach(p => {
     if (!pagosPorPartner[p.nombre]) pagosPorPartner[p.nombre] = [];
     pagosPorPartner[p.nombre].push(p);
   });
+
   const filas = gastos.map(g => {
     const badge = g.pagado_bool
       ? `<span class="badge badge-paid">Pagado</span>`
       : g.pagado_acum > 0
         ? `<span class="badge badge-partial">Parcial</span>`
         : `<span class="badge badge-pending">Pendiente</span>`;
+
     const saldoClass = g.saldo <= 0 ? "saldo-cero" : "saldo";
     const pagLink = `<a href="${escHtml(g.url)}" target="_blank" class="ext-link">${escHtml(g.comprobante)} ${iconoExt()}</a>`;
+
+    // Meta info: comprobante, referencia, cuenta, fecha
+    let metaItems = `<span class="gas-meta-item">${pagLink}</span>`;
+    if (g.referencia) {
+      metaItems += `<span class="gas-meta-item"><span class="gas-meta-label">Ref:</span> ${escHtml(g.referencia)}</span>`;
+    }
+    if (g.cuenta) {
+      metaItems += `<span class="gas-meta-item"><span class="gas-meta-label">Cuenta:</span> ${escHtml(g.cuenta)}</span>`;
+    }
+    metaItems += `<span class="gas-meta-item"><span class="gas-meta-label">${fmtFecha(g.fecha)}</span></span>`;
+
     const pagosDelPartner = pagosPorPartner[g.nombre] || [];
     let pagosHtml = "";
     if (pagosDelPartner.length) {
@@ -372,11 +385,12 @@ function renderGastos(gastos, pagos) {
         </div>`).join("");
       pagosHtml = `<div class="pagos-titulo">Pagos realizados</div>${filasPagos}`;
     }
+
     return `
     <div class="gas-item">
       <div class="gas-item-header">
         <div class="gas-nombre">${escHtml(g.nombre)} ${badge}</div>
-        <div class="gas-comprobante">${pagLink} · ${fmtFecha(g.fecha)}</div>
+        <div class="gas-meta">${metaItems}</div>
       </div>
       <div class="gas-montos">
         <div class="gas-monto-item">
@@ -395,6 +409,7 @@ function renderGastos(gastos, pagos) {
       ${pagosHtml}
     </div>`;
   }).join("");
+
   return `<div class="gas-table-wrap">${filas}</div>`;
 }
 
@@ -404,7 +419,6 @@ function actualizarUI(data) {
   const cantPersonas = (grupos_ingresos[0]?.items || []).length;
   const META = cantPersonas * APORTE_POR_PERSONA;
 
-  // Fila 1
   document.getElementById("kpi-ing").textContent    = fmt(resumen.total_ingresos);
   document.getElementById("kpi-ing-sub").textContent = resumen.cant_ingresos + " registro" + (resumen.cant_ingresos !== 1 ? "s" : "");
   document.getElementById("kpi-pagado").textContent  = fmt(resumen.total_pagado_gs);
@@ -412,13 +426,11 @@ function actualizarUI(data) {
   salEl.textContent = fmt(resumen.saldo_caja);
   salEl.className   = "kpi-value " + (resumen.saldo_caja >= 0 ? "pos" : "neg");
 
-  // Fila 2
   document.getElementById("kpi-gas").textContent       = fmt(resumen.total_gastos);
   document.getElementById("kpi-gas-sub").textContent    = resumen.cant_gastos + " factura" + (resumen.cant_gastos !== 1 ? "s" : "");
   document.getElementById("kpi-pagado2").textContent    = fmt(resumen.total_pagado_gs);
   document.getElementById("kpi-saldo-prov").textContent = fmt(resumen.total_gastos - resumen.total_pagado_gs);
 
-  // Progreso dinámico
   const pct = META > 0 ? Math.min(100, Math.round((resumen.total_ingresos / META) * 100)) : 0;
   document.getElementById("progress-fill").style.width = pct + "%";
   document.getElementById("pct-label").textContent     = pct + "%";
