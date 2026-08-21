@@ -172,16 +172,88 @@
     border-top-color:var(--green); border-radius:50%;
     animation:spin .7s linear infinite; display:inline-block;
   }
+  /* --- Pantalla de acceso --- */
+  #login { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .login-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:32px 28px;
+    width:100%; max-width:380px; text-align:center;
+  }
+  .login-icon {
+    width:48px; height:48px; border-radius:50%; background:var(--green-bg);
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; margin:0 auto 16px;
+  }
+  .login-title { font-size:17px; font-weight:600; margin-bottom:4px; }
+  .login-sub { font-size:13px; color:var(--muted); margin-bottom:24px; }
+  .login-card input {
+    width:100%; font-size:15px; padding:11px 13px; border-radius:6px;
+    border:1px solid var(--border); background:var(--bg); color:var(--text);
+    font-family:inherit; margin-bottom:12px;
+  }
+  .login-card input:focus { outline:none; border-color:var(--green); background:var(--surface); }
+  .login-campo { text-align:left; font-size:12px; color:var(--muted); margin-bottom:5px; }
+  .login-pista { font-size:11.5px; color:var(--hint); text-align:left; margin:-4px 0 14px; }
+  .btn-primary {
+    width:100%; font-size:14px; font-weight:500; padding:11px;
+    border-radius:6px; border:none; background:var(--green);
+    color:#fff; cursor:pointer; font-family:inherit;
+  }
+  .btn-primary:hover:not(:disabled) { background:#0c5a46; }
+  .btn-primary:disabled { opacity:.6; cursor:default; }
+  .btn-texto {
+    background:none; border:none; color:var(--muted); font-size:12px;
+    cursor:pointer; margin-top:14px; font-family:inherit; text-decoration:underline;
+  }
+  .btn-texto:hover { color:var(--text); }
+  .login-msg { font-size:12.5px; border-radius:6px; padding:9px 12px; margin-bottom:14px; text-align:left; }
+  .login-msg.err { background:var(--red-bg); color:var(--red); }
+  .login-msg.ok  { background:var(--green-bg); color:var(--green); }
+  .sesion { display:flex; align-items:center; gap:10px; }
+  .sesion-email { font-size:11px; color:var(--hint); }
+  .oculto { display:none !important; }
   @media (max-width:600px) {
     .kpi-row { grid-template-columns:1fr 1fr; }
     .kpi-row .kpi:last-child { grid-column:1 / -1; }
     main { padding:16px 12px 40px; }
+    .sesion-email { display:none; }
   }
 </style>
 </head>
 <body>
 
-<header>
+<div id="login">
+  <div class="login-card">
+    <div class="login-icon">🎓</div>
+    <div class="login-title">Fiesta Maristas 2027</div>
+    <div class="login-sub">Promoción 2002 · Estado financiero</div>
+
+    <div id="login-msg" class="login-msg oculto"></div>
+
+    <form id="form-login" onsubmit="ingresar(event)">
+      <div class="login-campo">Usuario</div>
+      <input type="text" id="login-usuario" autocomplete="username"
+             autocapitalize="none" spellcheck="false" required>
+      <div class="login-campo">Contraseña</div>
+      <input type="password" id="login-clave" autocomplete="current-password" required>
+      <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
+    </form>
+
+    <form id="form-cambio" class="oculto" onsubmit="guardarClave(event)">
+      <div class="login-campo">Contraseña actual</div>
+      <input type="password" id="clave-actual" autocomplete="current-password" required>
+      <div class="login-campo">Contraseña nueva</div>
+      <input type="password" id="clave-nueva" autocomplete="new-password" required>
+      <div class="login-campo">Repetir la nueva</div>
+      <input type="password" id="clave-repetir" autocomplete="new-password" required>
+      <div class="login-pista">Mínimo 8 caracteres.</div>
+      <button type="submit" class="btn-primary" id="btn-cambio">Guardar</button>
+      <button type="button" class="btn-texto" onclick="salir()">Cancelar</button>
+    </form>
+  </div>
+</div>
+
+<header class="oculto">
   <div class="header-left">
     <div class="header-icon">🎓</div>
     <div>
@@ -189,12 +261,16 @@
       <div class="header-sub">Promoción 2002 · Estado financiero</div>
     </div>
   </div>
-  <button class="btn-refresh" onclick="cargar()" id="btn-refresh">
-    <span id="refresh-icon">↻</span> Actualizar
-  </button>
+  <div class="sesion">
+    <span class="sesion-email" id="sesion-email"></span>
+    <button class="btn-refresh" onclick="cargar()" id="btn-refresh">
+      <span id="refresh-icon">↻</span> Actualizar
+    </button>
+    <button class="btn-refresh" onclick="salir()">Salir</button>
+  </div>
 </header>
 
-<main>
+<main class="oculto">
   <div id="error-box" style="display:none" class="error-msg"></div>
 
   <div class="kpi-section-label">Flujo de caja</div>
@@ -265,6 +341,137 @@
 <script>
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxiYPZLl_6BGHekxDlPEVUG438mKFGdkuwOLd0YC0QbZE_LMQ-r9D52qnHhyUj-sWdO/exec";
 const APORTE_POR_PERSONA = 3200;
+const CLAVE_TOKEN = "maristas2027_token";
+
+// ------------------------------------------------------------
+//  Acceso a la API
+// ------------------------------------------------------------
+// El Content-Type tiene que ser text/plain: con application/json
+// el navegador manda un preflight OPTIONS que Apps Script no
+// contesta, y el pedido falla por CORS.
+async function api(payload) {
+  const resp = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload)
+  });
+  return resp.json();
+}
+
+function getToken()  { return localStorage.getItem(CLAVE_TOKEN); }
+function getNombre() { return localStorage.getItem(CLAVE_TOKEN + "_nombre") || ""; }
+function setToken(t, nombre) {
+  localStorage.setItem(CLAVE_TOKEN, t);
+  if (nombre) localStorage.setItem(CLAVE_TOKEN + "_nombre", nombre);
+}
+function borrarToken() {
+  localStorage.removeItem(CLAVE_TOKEN);
+  localStorage.removeItem(CLAVE_TOKEN + "_nombre");
+}
+
+// ------------------------------------------------------------
+//  Pantalla de acceso
+// ------------------------------------------------------------
+function mensajeLogin(texto, tipo) {
+  const el = document.getElementById("login-msg");
+  el.textContent = texto;
+  el.className = "login-msg " + tipo;
+  el.classList.toggle("oculto", !texto);
+}
+
+function ocupado(idBoton, activo, textoOriginal) {
+  const b = document.getElementById(idBoton);
+  b.disabled = activo;
+  b.textContent = activo ? "Un momento…" : textoOriginal;
+}
+
+async function ingresar(ev) {
+  ev.preventDefault();
+  const usuario   = document.getElementById("login-usuario").value.trim();
+  const contrasena = document.getElementById("login-clave").value;
+  mensajeLogin("", "");
+  ocupado("btn-login", true);
+  try {
+    const r = await api({ accion: "login", usuario, contrasena });
+    if (!r.ok) throw new Error(r.error);
+    setToken(r.token, r.nombre);
+    document.getElementById("login-clave").value = "";
+    if (r.debe_cambiar) {
+      mostrarCambioClave("Es tu primer ingreso: elegí una contraseña propia para continuar.");
+    } else {
+      mostrarDashboard();
+    }
+  } catch (e) {
+    mensajeLogin(e.message, "err");
+    document.getElementById("login-clave").value = "";
+    document.getElementById("login-clave").focus();
+  } finally {
+    ocupado("btn-login", false, "Entrar");
+  }
+}
+
+function mostrarCambioClave(aviso) {
+  document.getElementById("form-login").classList.add("oculto");
+  document.getElementById("form-cambio").classList.remove("oculto");
+  document.getElementById("login").classList.remove("oculto");
+  document.querySelector("header").classList.add("oculto");
+  document.querySelector("main").classList.add("oculto");
+  mensajeLogin(aviso || "", aviso ? "ok" : "");
+  document.getElementById("clave-actual").focus();
+}
+
+async function guardarClave(ev) {
+  ev.preventDefault();
+  const actual  = document.getElementById("clave-actual").value;
+  const nueva   = document.getElementById("clave-nueva").value;
+  const repetir = document.getElementById("clave-repetir").value;
+
+  if (nueva !== repetir) {
+    mensajeLogin("Las dos contraseñas nuevas no coinciden.", "err");
+    return;
+  }
+  mensajeLogin("", "");
+  ocupado("btn-cambio", true);
+  try {
+    const r = await api({ accion: "cambiar", token: getToken(), actual, nueva });
+    if (!r.ok) throw new Error(r.error);
+    setToken(r.token, r.nombre);
+    ["clave-actual","clave-nueva","clave-repetir"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+    document.getElementById("form-cambio").classList.add("oculto");
+    document.getElementById("form-login").classList.remove("oculto");
+    mostrarDashboard();
+  } catch (e) {
+    mensajeLogin(e.message, "err");
+  } finally {
+    ocupado("btn-cambio", false, "Guardar");
+  }
+}
+
+function mostrarLogin() {
+  document.getElementById("login").classList.remove("oculto");
+  document.getElementById("form-cambio").classList.add("oculto");
+  document.getElementById("form-login").classList.remove("oculto");
+  document.querySelector("header").classList.add("oculto");
+  document.querySelector("main").classList.add("oculto");
+}
+
+function mostrarDashboard() {
+  document.getElementById("login").classList.add("oculto");
+  document.querySelector("header").classList.remove("oculto");
+  document.querySelector("main").classList.remove("oculto");
+  document.getElementById("sesion-email").textContent = getNombre();
+  cargar();
+}
+
+function salir() {
+  borrarToken();
+  ["login-usuario","login-clave","clave-actual","clave-nueva","clave-repetir"]
+    .forEach(id => { document.getElementById(id).value = ""; });
+  mostrarLogin();
+  mensajeLogin("", "");
+}
 
 function fmt(n) {
   return "Bs. " + Math.round(n).toLocaleString("es-BO");
@@ -438,11 +645,20 @@ async function cargar() {
   icon.innerHTML = `<span class="spinner" style="width:12px;height:12px;border-width:1.5px;"></span>`;
   document.getElementById("error-box").style.display = "none";
   try {
-    const resp = await fetch(APPS_SCRIPT_URL + "?t=" + Date.now());
-    const json = await resp.json();
+    const json = await api({ accion: "datos", token: getToken() });
     if (!json.ok) throw new Error(json.error || "Error desconocido");
     actualizarUI(json.data);
   } catch(e) {
+    if (e.message === "DEBE_CAMBIAR") {
+      mostrarCambioClave("Antes de seguir, elegí una contraseña propia.");
+      return;
+    }
+    if (e.message === "SESION_INVALIDA" || e.message === "SESION_EXPIRADA") {
+      borrarToken();
+      mostrarLogin();
+      mensajeLogin("Tu sesión venció. Volvé a entrar con tu usuario y contraseña.", "err");
+      return;
+    }
     document.getElementById("error-box").textContent = "Error al cargar datos: " + e.message;
     document.getElementById("error-box").style.display = "block";
   } finally {
@@ -451,8 +667,11 @@ async function cargar() {
   }
 }
 
-cargar();
-setInterval(cargar, 5 * 60 * 1000);
+// ------------------------------------------------------------
+//  Arranque
+// ------------------------------------------------------------
+if (getToken()) mostrarDashboard(); else mostrarLogin();
+setInterval(() => { if (getToken()) cargar(); }, 5 * 60 * 1000);
 </script>
 </body>
 </html>

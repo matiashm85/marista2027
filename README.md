@@ -18,7 +18,67 @@ Apps Script → Configuración del proyecto → Propiedades del script:
 | `ODOO_USER`  | tu email de Odoo               |
 | `ODOO_KEY`   | API key de Odoo                |
 
+Estas dos se generan solas, no hay que crearlas a mano:
+
+| Propiedad     | Para qué sirve                                                      |
+|---------------|---------------------------------------------------------------------|
+| `AUTH_SECRET` | Firma de sesiones y pepper de las contraseñas                        |
+| `HOJA_ID`     | ID de la planilla de usuarios                                        |
+
+> ⚠️ Si se borra `AUTH_SECRET` dejan de valer **todas las contraseñas** y hay
+> que restablecerlas una por una. No la toques.
+
+## Acceso
+
+Usuario y contraseña. Los usuarios viven en una Google Sheet aparte
+(«Usuarios · Dashboard Maristas 2027»), que se crea sola la primera vez.
+
+Las contraseñas no se guardan: se guarda un hash HMAC-SHA256 con un salt
+distinto por usuario más el pepper del script, repetido 1.000 veces para
+encarecer la fuerza bruta. Ni la planilla ni los logs ven la contraseña.
+
+Al entrar, el usuario recibe un token firmado que dura 30 días en
+`localStorage`. Máximo 8 intentos fallidos por usuario cada 15 minutos.
+
+`doGet` ya no devuelve datos — todo pasa por `POST` con token.
+
+### Dar de alta a la promoción
+
+Desde el editor de Apps Script, elegir la función y darle a ejecutar:
+
+| Función                        | Qué hace                                                        |
+|--------------------------------|------------------------------------------------------------------|
+| `autorizar()`                  | Concede permisos y dice dónde quedó la planilla. **Correr primero** |
+| `crearUsuariosDesdeOdoo()`     | Crea un usuario por aportante y muestra las credenciales           |
+| `crearUsuario(u, nombre, pass)`| Alta suelta. Sin `pass`, genera una al azar                        |
+| `restablecerContrasena(u)`     | Para el que se la olvidó                                           |
+| `desactivarUsuario(u)`         | Le corta el acceso sin borrarlo                                    |
+| `activarUsuario(u)`            | Lo vuelve a habilitar                                              |
+| `listarUsuarios()`             | Quién hay, quién entró y cuándo                                    |
+
+Las credenciales salen en el registro de ejecución (Ver → Registros).
+Se reparten por WhatsApp; **el sistema no manda mails**.
+
+`crearUsuariosDesdeOdoo()` toma a los aportantes de las facturas de cliente,
+así que los proveedores nunca entran. Los usuarios salen del nombre
+(«Ana Pérez» → `ana.perez`) y se pueden editar en la planilla. Correrlo de
+nuevo sólo da de alta a los que falten, no duplica a nadie.
+
+Todos entran con una contraseña generada y el sistema **les exige cambiarla**
+en el primer ingreso antes de mostrarles nada.
+
+### Administrar a mano
+
+La planilla se puede editar directo. La columna `activo` en `NO` bloquea a
+alguien; `debe_cambiar` en `SI` lo obliga a elegir contraseña nueva.
+No toques `hash` ni `salt`: si querés cambiarle la contraseña a alguien,
+usá `restablecerContrasena()`.
+
 ## Publicar cambios
+
+**Orden:** primero el backend, después el frontend. En el medio hay ~1 minuto
+en que el sitio queda caído, porque el HTML viejo llama por `GET` y el backend
+nuevo ya sólo responde `POST`.
 
 Backend (`apps-script/Codigo.js`):
 
@@ -27,6 +87,10 @@ cd apps-script
 clasp push
 clasp deploy -i <DEPLOYMENT_ID> -d "descripción del cambio"
 ```
+
+La primera vez que se publica el login hay que **autorizar los permisos nuevos**:
+abrir el editor de Apps Script, elegir la función `autorizar` y ejecutarla una vez.
+Sin eso el script no puede tocar la planilla de usuarios y todo login falla.
 
 El `-i <DEPLOYMENT_ID>` actualiza la implementación existente y **mantiene la URL**.
 Sin ese flag se crea una URL nueva y hay que tocar `index.html`.
