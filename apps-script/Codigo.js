@@ -44,7 +44,7 @@ function CFG() {
 
 const SESION_DIAS      = 30;     // duración de la sesión
 const MAX_INTENTOS     = 8;      // intentos fallidos por usuario cada 15 min
-const ITERACIONES_HASH = 1000;   // estiramiento del hash
+const ITERACIONES_HASH = 20000;  // estiramiento del hash (SHA-256 puro, barato)
 const LARGO_MINIMO     = 8;      // largo mínimo de contraseña
 const HOJA_USUARIOS    = "Usuarios";
 const COLUMNAS = ["usuario","nombre","hash","salt","activo","debe_cambiar","creado","ultimo_acceso"];
@@ -55,13 +55,17 @@ const COLUMNAS = ["usuario","nombre","hash","salt","activo","debe_cambiar","crea
 //  OJO: si se borra AUTH_SECRET dejan de valer TODAS las
 //  contraseñas y hay que restablecerlas una por una.
 // ------------------------------------------------------------
+let _secreto = null;
+
 function secreto() {
-  const p = PropertiesService.getScriptProperties();
+  if (_secreto) return _secreto;          // sin esto se lee la propiedad
+  const p = PropertiesService.getScriptProperties();   // en cada vuelta del bucle
   let s = p.getProperty("AUTH_SECRET");
   if (!s) {
     s = Utilities.getUuid() + Utilities.getUuid();
     p.setProperty("AUTH_SECRET", s);
   }
+  _secreto = s;
   return s;
 }
 
@@ -81,13 +85,106 @@ function comparaSegura(a, b) {
 }
 
 // ------------------------------------------------------------
+//  SHA-256 en JavaScript puro
+// ------------------------------------------------------------
+//  Apps Script tiene Utilities.computeHmacSha256Signature, pero
+//  cada llamada cruza a Java y cuesta milisegundos. Para estirar
+//  el hash miles de veces hay que quedarse dentro de V8.
+// ------------------------------------------------------------
+const _K256 = [
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+  0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+  0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+  0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+];
+
+function _utf8Bytes(s) {
+  const out = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) {
+      out.push(c);
+    } else if (c < 0x800) {
+      out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+    } else if (c >= 0xd800 && c < 0xdc00) {          // par suplente
+      const cp = 0x10000 + ((c - 0xd800) << 10) + (s.charCodeAt(++i) - 0xdc00);
+      out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63),
+               0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+    } else {
+      out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+  }
+  return out;
+}
+
+function sha256Hex(texto) {
+  const msg = _utf8Bytes(String(texto));
+  const bits = msg.length * 8;
+
+  msg.push(0x80);
+  while (msg.length % 64 !== 56) msg.push(0);
+  // Largo en 64 bits big-endian. Los 32 altos van en 0: nunca
+  // vamos a hashear medio exabyte.
+  msg.push(0, 0, 0, 0,
+           (bits >>> 24) & 255, (bits >>> 16) & 255, (bits >>> 8) & 255, bits & 255);
+
+  let h0=0x6a09e667, h1=0xbb67ae85, h2=0x3c6ef372, h3=0xa54ff53a,
+      h4=0x510e527f, h5=0x9b05688c, h6=0x1f83d9ab, h7=0x5be0cd19;
+  const w = new Array(64);
+
+  for (let i = 0; i < msg.length; i += 64) {
+    for (let t = 0; t < 16; t++) {
+      const j = i + t * 4;
+      w[t] = (msg[j] << 24) | (msg[j+1] << 16) | (msg[j+2] << 8) | msg[j+3];
+    }
+    for (let t = 16; t < 64; t++) {
+      const x = w[t-15], y = w[t-2];
+      const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+      const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+      w[t] = (w[t-16] + s0 + w[t-7] + s1) | 0;
+    }
+
+    let a=h0, b=h1, c=h2, d=h3, e=h4, f=h5, g=h6, h=h7;
+    for (let t = 0; t < 64; t++) {
+      const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + _K256[t] + w[t]) | 0;
+      const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0;
+      d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    h0=(h0+a)|0; h1=(h1+b)|0; h2=(h2+c)|0; h3=(h3+d)|0;
+    h4=(h4+e)|0; h5=(h5+f)|0; h6=(h6+g)|0; h7=(h7+h)|0;
+  }
+
+  let hex = "";
+  [h0,h1,h2,h3,h4,h5,h6,h7].forEach(x => {
+    let s = (x >>> 0).toString(16);
+    while (s.length < 8) s = "0" + s;
+    hex += s;
+  });
+  return hex;
+}
+
+// ------------------------------------------------------------
 //  Hash de contraseña: salt por usuario + pepper del script,
 //  repetido ITERACIONES_HASH veces para encarecer la fuerza bruta
 // ------------------------------------------------------------
+//  Usa sha256Hex (JavaScript puro) y no Utilities: estirar el
+//  hash con llamadas a servicios de Apps Script tardaba ~1 minuto
+//  por contraseña, y eso corre en cada login.
+// ------------------------------------------------------------
 function hashContrasena(contrasena, salt) {
-  let acc = String(salt) + ":" + String(contrasena);
-  for (let i = 0; i < ITERACIONES_HASH; i++) acc = hmac(acc);
-  return acc;
+  const pepper = secreto();               // se resuelve una sola vez
+  let h = sha256Hex(String(salt) + ":" + String(contrasena) + ":" + pepper);
+  for (let i = 0; i < ITERACIONES_HASH; i++) h = sha256Hex(h + pepper);
+  return h;
 }
 
 function validarContrasena(valor) {
@@ -183,8 +280,9 @@ function esSi(valor) {
 function guardarContrasena(fila, contrasena, debeCambiar) {
   const salt = Utilities.getUuid();
   const h = hojaUsuarios();
-  h.getRange(fila, COLUMNAS.indexOf("hash") + 1).setValue(hashContrasena(contrasena, salt));
-  h.getRange(fila, COLUMNAS.indexOf("salt") + 1).setValue(salt);
+  // hash y salt son columnas contiguas: una sola escritura
+  h.getRange(fila, COLUMNAS.indexOf("hash") + 1, 1, 2)
+   .setValues([[hashContrasena(contrasena, salt), salt]]);
   h.getRange(fila, COLUMNAS.indexOf("debe_cambiar") + 1).setValue(debeCambiar ? "SI" : "NO");
 }
 
@@ -323,24 +421,82 @@ function crearUsuariosDesdeOdoo() {
   // Se saltea por NOMBRE, no por usuario generado: si no, al correrlo
   // dos veces le crearía "ana.perez2" a la misma Ana Pérez.
   const yaTienen = existentes.map(u => String(u.nombre || "").trim().toLowerCase());
-  const nuevos = [];
   const h = hojaUsuarios();
+  const cambios = [];
 
+  // 1) Reparar filas a medio escribir (una corrida que se cortó
+  //    por tiempo deja el usuario sin hash y sin salt).
+  existentes.forEach(u => {
+    if (String(u.hash || "").trim() && String(u.salt || "").trim()) return;
+    const pass = contrasenaAlAzar();
+    guardarContrasena(u._fila, pass, true);
+    cambios.push({ nombre: String(u.nombre || ""), usuario: normalizarUsuario(u.usuario),
+                   contrasena: pass, nota: "reparado" });
+  });
+
+  // 2) Dar de alta a los que falten, en un solo bloque de escritura
+  const filas = [];
   aportantes().forEach(p => {
     const clave = p.nombre.trim().toLowerCase();
     if (yaTienen.indexOf(clave) !== -1) return;
 
     const usuario = usuarioDesdeNombre(p.nombre, tomados);
     const pass    = contrasenaAlAzar();
-    h.appendRow([usuario, p.nombre, "", "", "SI", "SI", new Date(), ""]);
-    guardarContrasena(h.getLastRow(), pass, true);
+    const salt    = Utilities.getUuid();
+    filas.push([usuario, p.nombre, hashContrasena(pass, salt), salt,
+                "SI", "SI", new Date(), ""]);
     yaTienen.push(clave);
-    nuevos.push({ nombre: p.nombre, usuario: usuario, contrasena: pass });
+    cambios.push({ nombre: p.nombre, usuario: usuario, contrasena: pass, nota: "nuevo" });
   });
 
-  Logger.log(nuevos.length + " usuario(s) nuevo(s):\n" +
-    nuevos.map(n => n.nombre + "  →  " + n.usuario + " / " + n.contrasena).join("\n"));
-  return nuevos;
+  if (filas.length) {
+    h.getRange(h.getLastRow() + 1, 1, filas.length, COLUMNAS.length).setValues(filas);
+  }
+
+  Logger.log(informeCredenciales(cambios));
+  return cambios;
+}
+
+// Vuelve a generar la contraseña de TODOS los usuarios cargados.
+// Sirve cuando cambió la forma de calcular el hash y los viejos
+// dejaron de valer. Todos quedan obligados a cambiarla al entrar.
+function regenerarTodasLasClaves() {
+  const cambios = leerUsuarios().map(u => {
+    const pass = contrasenaAlAzar();
+    guardarContrasena(u._fila, pass, true);
+    return { nombre: String(u.nombre || ""), usuario: normalizarUsuario(u.usuario),
+             contrasena: pass, nota: "regenerado" };
+  });
+  Logger.log(informeCredenciales(cambios));
+  return cambios;
+}
+
+function informeCredenciales(cambios) {
+  if (!cambios.length) return "No hubo cambios: ya estaban todos cargados.";
+  const ancho = Math.max.apply(null, cambios.map(c => c.usuario.length));
+  return cambios.length + " credencial(es) — copiá esto antes de cerrar:\n\n" +
+    cambios.map(c =>
+      c.usuario + Array(ancho - c.usuario.length + 3).join(" ") +
+      c.contrasena + "   (" + c.nombre + ")"
+    ).join("\n");
+}
+
+// Mide cuánto tarda de verdad un hash en este entorno.
+function diagnostico() {
+  const t0 = Date.now();
+  hashContrasena("prueba-de-tiempo", "salt-de-prueba");
+  const conHash = Date.now() - t0;
+
+  const t1 = Date.now();
+  for (let i = 0; i < 20; i++) hmac("x" + i);
+  const conUtilities = Date.now() - t1;
+
+  const informe =
+    "Hash de una contraseña (" + ITERACIONES_HASH + " vueltas): " + conHash + " ms\n" +
+    "20 llamadas a Utilities.computeHmacSha256Signature: " + conUtilities + " ms\n" +
+    "Usuarios cargados: " + leerUsuarios().length;
+  Logger.log(informe);
+  return informe;
 }
 
 // Le da una contraseña nueva a alguien que la perdió.

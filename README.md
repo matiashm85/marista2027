@@ -33,9 +33,16 @@ Estas dos se generan solas, no hay que crearlas a mano:
 Usuario y contraseña. Los usuarios viven en una Google Sheet aparte
 («Usuarios · Dashboard Maristas 2027»), que se crea sola la primera vez.
 
-Las contraseñas no se guardan: se guarda un hash HMAC-SHA256 con un salt
-distinto por usuario más el pepper del script, repetido 1.000 veces para
-encarecer la fuerza bruta. Ni la planilla ni los logs ven la contraseña.
+Las contraseñas no se guardan: se guarda un hash SHA-256 con un salt distinto
+por usuario más el pepper del script, repetido 20.000 veces para encarecer la
+fuerza bruta. Ni la planilla ni los logs ven la contraseña.
+
+El SHA-256 está implementado a mano en `Codigo.js` en vez de usar
+`Utilities.computeHmacSha256Signature`. No es capricho: cada llamada a
+`Utilities` cruza a Java y, estirando el hash miles de veces, una sola
+contraseña tardaba **un minuto**. En JavaScript puro son milisegundos.
+Si tocás `sha256Hex`, verificá contra una implementación de referencia:
+un bit de diferencia deja afuera a todos los usuarios.
 
 Al entrar, el usuario recibe un token firmado que dura 30 días en
 `localStorage`. Máximo 8 intentos fallidos por usuario cada 15 minutos.
@@ -52,9 +59,15 @@ Desde el editor de Apps Script, elegir la función y darle a ejecutar:
 | `crearUsuariosDesdeOdoo()`     | Crea un usuario por aportante y muestra las credenciales           |
 | `crearUsuario(u, nombre, pass)`| Alta suelta. Sin `pass`, genera una al azar                        |
 | `restablecerContrasena(u)`     | Para el que se la olvidó                                           |
+| `regenerarTodasLasClaves()`    | Nuevas contraseñas para **todos**. Sólo si cambió el hash          |
 | `desactivarUsuario(u)`         | Le corta el acceso sin borrarlo                                    |
 | `activarUsuario(u)`            | Lo vuelve a habilitar                                              |
 | `listarUsuarios()`             | Quién hay, quién entró y cuándo                                    |
+| `diagnostico()`                | Mide cuánto tarda un hash en este entorno                          |
+
+`crearUsuariosDesdeOdoo()` también repara filas a medio escribir: si una
+corrida se cortó por tiempo y dejó a alguien sin `hash` ni `salt`, le genera
+la contraseña que le faltaba en vez de saltearlo.
 
 Las credenciales salen en el registro de ejecución (Ver → Registros).
 Se reparten por WhatsApp; **el sistema no manda mails**.
