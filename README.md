@@ -64,6 +64,7 @@ Desde el editor de Apps Script, elegir la función y darle a ejecutar:
 | `activarUsuario(u)`            | Lo vuelve a habilitar                                              |
 | `listarUsuarios()`             | Quién hay, quién entró y cuándo                                    |
 | `diagnostico()`                | Mide cuánto tarda un hash en este entorno                          |
+| `diagnosticoAdjuntos()`        | Lista qué comprobante tiene cargado cada gasto                     |
 
 `crearUsuariosDesdeOdoo()` también repara filas a medio escribir: si una
 corrida se cortó por tiempo y dejó a alguien sin `hash` ni `salt`, le genera
@@ -115,6 +116,25 @@ git add -A && git commit -m "..." && git push
 ```
 
 GitHub Pages se actualiza solo en ~1 minuto.
+
+## Comprobantes de gastos
+
+Cada gasto muestra sus adjuntos de Odoo (`ir.attachment` con
+`res_model = account.move`), no un enlace al registro: los compañeros no
+tienen cuenta en Odoo, así que ese enlace no les servía de nada.
+
+El archivo **no** se sirve desde Odoo. Va por la acción `adjunto` del backend,
+que lo trae por XML-RPC y lo devuelve en base64; el navegador arma un `Blob` y
+lo abre. Así el comprobante queda detrás del mismo login que el resto, sin
+tener que exponer URLs públicas de Odoo.
+
+Antes de leer el contenido se verifica que el adjunto cuelgue de una factura
+de proveedor publicada. Sin esa comprobación, cualquiera con sesión podría
+pedir por id cualquier archivo de la base (contratos, adjuntos de RRHH, lo que
+haya). Los archivos de más de 8 MB se rechazan.
+
+Si un gasto dice «sin comprobante», es que en Odoo no tiene nada adjunto.
+`diagnosticoAdjuntos()` lista qué ve el script para cada factura.
 
 ## Notas de Odoo
 

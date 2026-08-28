@@ -536,6 +536,81 @@ function listarUsuarios() {
   return filas;
 }
 
+// ------------------------------------------------------------
+//  Entrega el archivo de un comprobante adjunto
+// ------------------------------------------------------------
+//  Se comprueba que el adjunto cuelgue de una factura de
+//  proveedor publicada ANTES de leer el contenido. Sin eso,
+//  cualquiera con sesión podría pedir por id cualquier archivo
+//  de la base de Odoo.
+// ------------------------------------------------------------
+const PESO_MAXIMO_ADJUNTO = 8 * 1024 * 1024;   // 8 MB
+
+function obtenerAdjunto(idCrudo) {
+  const id = parseInt(idCrudo, 10);
+  if (!id || id < 1) throw new Error("Comprobante inválido.");
+
+  const uid = autenticar();
+
+  const meta = buscar(uid, "ir.attachment",
+    [["id","=",id], ["res_model","=","account.move"], ["type","=","binary"]],
+    ["id","name","mimetype","res_id","file_size"], 1, "id asc"
+  );
+  if (!meta.length) throw new Error("No se encontró ese comprobante.");
+  const a = meta[0];
+
+  const factura = buscar(uid, "account.move",
+    [["id","=",a.res_id],
+     ["move_type","in",["in_invoice","in_receipt"]],
+     ["state","=","posted"]],
+    ["id"], 1, "id asc"
+  );
+  if (!factura.length) throw new Error("Ese comprobante no corresponde a un gasto.");
+
+  if ((a.file_size || 0) > PESO_MAXIMO_ADJUNTO) {
+    throw new Error("El archivo pesa " + Math.round(a.file_size / 1048576) +
+      " MB y no se puede abrir desde acá. Pedíselo a la comisión.");
+  }
+
+  const conDatos = buscar(uid, "ir.attachment", [["id","=",id]], ["id","datas"], 1, "id asc");
+  if (!conDatos.length || !conDatos[0].datas) throw new Error("El comprobante está vacío.");
+
+  return {
+    ok:     true,
+    nombre: a.name || "comprobante",
+    tipo:   a.mimetype || "application/octet-stream",
+    datos:  conDatos[0].datas          // base64
+  };
+}
+
+// Para correr desde el editor: muestra qué adjuntos ve el script.
+function diagnosticoAdjuntos() {
+  const uid = autenticar();
+  const facturas = buscar(uid, "account.move",
+    [["move_type","in",["in_invoice","in_receipt"]], ["state","=","posted"]],
+    ["id","name"], 500, "id desc"
+  );
+  const adjuntos = buscar(uid, "ir.attachment",
+    [["res_model","=","account.move"], ["res_id","in", facturas.map(f => f.id)],
+     ["type","=","binary"]],
+    ["id","name","mimetype","res_id","file_size"], 500, "id asc"
+  );
+
+  const porFactura = {};
+  adjuntos.forEach(a => {
+    porFactura[a.res_id] = (porFactura[a.res_id] || []).concat(
+      a.name + " (" + (a.mimetype || "?") + ", " +
+      Math.round((a.file_size || 0) / 1024) + " KB)");
+  });
+
+  const informe = facturas.length + " gasto(s), " + adjuntos.length + " adjunto(s)\n\n" +
+    facturas.map(f =>
+      f.name + ": " + ((porFactura[f.id] || []).join(" | ") || "SIN COMPROBANTE")
+    ).join("\n");
+  Logger.log(informe);
+  return informe;
+}
+
 // Corré esto UNA VEZ desde el editor para autorizar los permisos
 // y para saber dónde quedó la planilla de usuarios.
 function autorizar() {
@@ -576,6 +651,12 @@ function doPost(e) {
         const s = sesion(req.token);
         if (s.c) throw new Error("DEBE_CAMBIAR");
         return respuestaJson({ ok: true, usuario: s.u, data: obtenerDatos() });
+      }
+
+      case "adjunto": {
+        const s = sesion(req.token);
+        if (s.c) throw new Error("DEBE_CAMBIAR");
+        return respuestaJson(obtenerAdjunto(req.id));
       }
 
       default:
@@ -762,6 +843,25 @@ function obtenerDatos() {
     });
   }
 
+  // Comprobantes adjuntos de cada factura. Sólo los metadatos:
+  // el archivo se pide aparte, cuando alguien lo abre.
+  const mapaAdjuntos = {};
+  const idsGastos = rawGastos.map(f => f.id);
+  if (idsGastos.length) {
+    buscar(uid, "ir.attachment",
+      [["res_model","=","account.move"], ["res_id","in",idsGastos], ["type","=","binary"]],
+      ["id","name","mimetype","res_id","file_size"], 500, "id asc"
+    ).forEach(a => {
+      if (!mapaAdjuntos[a.res_id]) mapaAdjuntos[a.res_id] = [];
+      mapaAdjuntos[a.res_id].push({
+        id:     a.id,
+        nombre: a.name || "comprobante",
+        tipo:   a.mimetype || "",
+        peso:   a.file_size || 0
+      });
+    });
+  }
+
   const gastos = rawGastos.map(f => {
     const totalDoc  = f.amount_total    || 0;
     const saldoDoc  = f.amount_residual || 0;
@@ -778,6 +878,7 @@ function obtenerDatos() {
       pagado_acum: pagadoDoc,
       saldo:       saldoDoc,
       pagado_bool: f.payment_state === "paid" || f.payment_state === "in_payment",
+      adjuntos:    mapaAdjuntos[f.id] || [],
       url:         c.url + "/odoo/vendor-bills/" + f.id
     };
   });

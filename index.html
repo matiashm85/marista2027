@@ -159,6 +159,8 @@
     display:inline-flex; align-items:center; gap:3px;
   }
   .ext-link:hover { text-decoration:underline; }
+  .ext-link + .ext-link { margin-left:10px; }
+  .sin-comprobante { font-size:11px; color:var(--hint); font-style:italic; }
   .status-msg { text-align:center; padding:28px; color:var(--muted); font-size:13px; }
   .error-msg {
     background:var(--red-bg); color:var(--red);
@@ -533,6 +535,54 @@ function toggleGrupo(gi) {
   document.getElementById("arrow-" + gi).classList.toggle("open");
 }
 
+function iconoAdjunto() {
+  return `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px">
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+  </svg>`;
+}
+
+// Los adjuntos de Odoo suelen llamarse cosas larguísimas
+function nombreCorto(nombre) {
+  const n = String(nombre || "comprobante");
+  return n.length <= 28 ? n : n.slice(0, 16) + "…" + n.slice(-10);
+}
+
+// Abre el comprobante en una pestaña nueva. La pestaña se abre
+// ANTES de pedir el archivo: si se abriera después del await, el
+// navegador la bloquearía por no venir de un clic directo.
+async function verAdjunto(ev, id) {
+  ev.preventDefault();
+  const ventana = window.open("", "_blank");
+  if (ventana) {
+    ventana.document.write(
+      '<title>Abriendo comprobante…</title>' +
+      '<p style="font-family:sans-serif;color:#6b6b66;padding:24px">Abriendo comprobante…</p>');
+  }
+  try {
+    const r = await api({ accion: "adjunto", token: getToken(), id: id });
+    if (!r.ok) throw new Error(r.error);
+
+    const binario = atob(r.datos);
+    const bytes = new Uint8Array(binario.length);
+    for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: r.tipo }));
+
+    if (ventana) ventana.location.href = url;
+    else window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch (e) {
+    if (ventana) ventana.close();
+    if (e.message === "SESION_INVALIDA" || e.message === "SESION_EXPIRADA") {
+      borrarToken();
+      mostrarLogin();
+      mensajeLogin("Tu sesión venció. Volvé a entrar con tu usuario y contraseña.", "err");
+      return;
+    }
+    alert("No se pudo abrir el comprobante.\n\n" + e.message);
+  }
+}
+
 function renderGastos(gastos, pagos) {
   if (!gastos || !gastos.length) return '<div class="status-msg">Sin gastos</div>';
 
@@ -550,9 +600,18 @@ function renderGastos(gastos, pagos) {
         : `<span class="badge badge-pending">Pendiente</span>`;
 
     const saldoClass = g.saldo <= 0 ? "saldo-cero" : "saldo";
-    const pagLink = `<a href="${escHtml(g.url)}" target="_blank" class="ext-link">${escHtml(g.comprobante)} ${iconoExt()}</a>`;
 
-    let metaItems = `<span class="gas-meta-item">${pagLink}</span>`;
+    const adjuntos = g.adjuntos || [];
+    const comprobantes = adjuntos.length
+      ? adjuntos.map(a =>
+          `<a href="#" class="ext-link" onclick="verAdjunto(event,${a.id})"
+              title="${escHtml(a.nombre)}">${iconoAdjunto()} ${escHtml(nombreCorto(a.nombre))}</a>`
+        ).join(" ")
+      : `<span class="sin-comprobante">sin comprobante</span>`;
+
+    let metaItems =
+      `<span class="gas-meta-item"><span class="gas-meta-label">${escHtml(g.comprobante)}</span></span>` +
+      `<span class="gas-meta-item">${comprobantes}</span>`;
     if (g.referencia) {
       metaItems += `<span class="gas-meta-item"><span class="gas-meta-label">Ref:</span> ${escHtml(g.referencia)}</span>`;
     }
