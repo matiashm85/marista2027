@@ -161,6 +161,71 @@
   .ext-link:hover { text-decoration:underline; }
   .ext-link + .ext-link { margin-left:10px; }
   .sin-comprobante { font-size:11px; color:var(--hint); font-style:italic; }
+
+  /* --- Panel de usuarios (sólo administradores) --- */
+  .modal-fondo {
+    position:fixed; inset:0; background:rgba(26,26,24,.45);
+    display:flex; align-items:flex-start; justify-content:center;
+    padding:24px 16px; overflow-y:auto; z-index:50;
+  }
+  .modal {
+    background:var(--surface); border-radius:var(--radius);
+    width:100%; max-width:680px; padding:22px;
+  }
+  .modal-head {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:16px;
+  }
+  .modal-titulo { font-size:15px; font-weight:600; }
+  .btn-cerrar {
+    background:none; border:none; font-size:22px; line-height:1;
+    color:var(--muted); cursor:pointer; padding:0 4px; font-family:inherit;
+  }
+  .alta-form { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:end; }
+  .alta-form label { font-size:11px; color:var(--muted); display:block; margin-bottom:4px; }
+  .alta-form input {
+    width:100%; font-size:13px; padding:8px 10px; border-radius:6px;
+    border:1px solid var(--border); background:var(--bg);
+    color:var(--text); font-family:inherit;
+  }
+  .alta-form input:focus { outline:none; border-color:var(--green); background:var(--surface); }
+  .alta-form .btn-primary { width:auto; padding:8px 18px; }
+  .credencial {
+    background:var(--green-bg); border-radius:6px; padding:12px 14px;
+    margin-top:14px; font-size:13px;
+  }
+  .credencial code {
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:14px; font-weight:600; color:var(--green);
+    background:var(--surface); padding:2px 7px; border-radius:4px;
+  }
+  .credencial-aviso { font-size:11.5px; color:var(--muted); margin-top:7px; }
+  .tabla-usuarios { width:100%; border-collapse:collapse; margin-top:18px; font-size:12.5px; }
+  .tabla-usuarios th {
+    text-align:left; font-size:10px; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--hint); font-weight:500;
+    padding:6px 8px; border-bottom:1px solid var(--border);
+  }
+  .tabla-usuarios td { padding:8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .tabla-usuarios tr.inactivo td { opacity:.5; }
+  .usuario-clave { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+  .btn-mini {
+    font-size:11px; padding:4px 9px; border-radius:5px; cursor:pointer;
+    border:1px solid var(--border); background:var(--surface);
+    color:var(--muted); font-family:inherit; margin-left:4px;
+  }
+  .btn-mini:hover:not(:disabled) { background:var(--bg); color:var(--text); }
+  .btn-mini:disabled { opacity:.4; cursor:default; }
+  .etiqueta-admin {
+    font-size:9.5px; text-transform:uppercase; letter-spacing:.04em;
+    background:var(--blue-bg); color:var(--blue);
+    padding:2px 6px; border-radius:99px; margin-left:5px;
+  }
+  @media (max-width:600px) {
+    .alta-form { grid-template-columns:1fr; }
+    .alta-form .btn-primary { width:100%; }
+    .col-opcional { display:none; }
+  }
   .status-msg { text-align:center; padding:28px; color:var(--muted); font-size:13px; }
   .error-msg {
     background:var(--red-bg); color:var(--red);
@@ -265,12 +330,39 @@
   </div>
   <div class="sesion">
     <span class="sesion-email" id="sesion-email"></span>
+    <button class="btn-refresh oculto" onclick="abrirPanelUsuarios()" id="btn-usuarios">Usuarios</button>
     <button class="btn-refresh" onclick="cargar()" id="btn-refresh">
       <span id="refresh-icon">↻</span> Actualizar
     </button>
     <button class="btn-refresh" onclick="salir()">Salir</button>
   </div>
 </header>
+
+<div id="panel-usuarios" class="modal-fondo oculto" onclick="cerrarPanelSiEsFuera(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-titulo">Usuarios</div>
+      <button class="btn-cerrar" onclick="cerrarPanelUsuarios()" title="Cerrar">&times;</button>
+    </div>
+
+    <form class="alta-form" onsubmit="crearUsuarioNuevo(event)">
+      <div>
+        <label for="nuevo-usuario">Usuario</label>
+        <input type="text" id="nuevo-usuario" placeholder="nombre.apellido"
+               autocapitalize="none" spellcheck="false" required>
+      </div>
+      <div>
+        <label for="nuevo-nombre">Nombre y apellido</label>
+        <input type="text" id="nuevo-nombre" placeholder="Nombre Apellido">
+      </div>
+      <button type="submit" class="btn-primary" id="btn-crear">Crear</button>
+    </form>
+
+    <div id="panel-msg" class="login-msg oculto"></div>
+    <div id="panel-credencial"></div>
+    <div id="panel-lista"><div class="status-msg"><span class="spinner"></span></div></div>
+  </div>
+</div>
 
 <main class="oculto">
   <div id="error-box" style="display:none" class="error-msg"></div>
@@ -469,6 +561,8 @@ function mostrarDashboard() {
 
 function salir() {
   borrarToken();
+  cerrarPanelUsuarios();
+  document.getElementById("btn-usuarios").classList.add("oculto");
   ["login-usuario","login-clave","clave-actual","clave-nueva","clave-repetir"]
     .forEach(id => { document.getElementById(id).value = ""; });
   mostrarLogin();
@@ -486,6 +580,11 @@ function fmtFecha(str) {
 }
 function escHtml(s) {
   return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+// Para valores que van DENTRO de un atributo: ahí las comillas
+// también rompen, y escHtml no las toca.
+function escAttr(s) {
+  return escHtml(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 function iconoExt() {
   return `<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2v8h8V7M7 2h3v3M10 2L5.5 6.5"/></svg>`;
@@ -533,6 +632,145 @@ function renderGruposIngresos(grupos) {
 function toggleGrupo(gi) {
   document.getElementById("body-" + gi).classList.toggle("open");
   document.getElementById("arrow-" + gi).classList.toggle("open");
+}
+
+// ------------------------------------------------------------
+//  Panel de usuarios (sólo administradores)
+// ------------------------------------------------------------
+function mensajePanel(texto, tipo) {
+  const el = document.getElementById("panel-msg");
+  el.textContent = texto;
+  el.className = "login-msg " + (tipo || "");
+  el.classList.toggle("oculto", !texto);
+}
+
+function abrirPanelUsuarios() {
+  document.getElementById("panel-usuarios").classList.remove("oculto");
+  mensajePanel("", "");
+  document.getElementById("panel-credencial").innerHTML = "";
+  listarUsuarios();
+}
+
+function cerrarPanelUsuarios() {
+  document.getElementById("panel-usuarios").classList.add("oculto");
+}
+
+function cerrarPanelSiEsFuera(ev) {
+  if (ev.target.id === "panel-usuarios") cerrarPanelUsuarios();
+}
+
+async function panelApi(payload) {
+  const r = await api(Object.assign({ token: getToken() }, payload));
+  if (!r.ok) throw new Error(r.error);
+  return r;
+}
+
+function mostrarCredencial(usuario, contrasena, titulo) {
+  document.getElementById("panel-credencial").innerHTML = `
+    <div class="credencial">
+      <div>${escHtml(titulo)}</div>
+      <div style="margin-top:8px">
+        Usuario <code>${escHtml(usuario)}</code>
+        &nbsp; Contraseña <code>${escHtml(contrasena)}</code>
+      </div>
+      <div class="credencial-aviso">
+        Copiala ahora y mandásela. No se puede volver a ver: si se pierde,
+        hay que generar otra. Se la va a pedir cambiar al entrar.
+      </div>
+    </div>`;
+}
+
+async function crearUsuarioNuevo(ev) {
+  ev.preventDefault();
+  const usuario = document.getElementById("nuevo-usuario").value;
+  const nombre  = document.getElementById("nuevo-nombre").value;
+  mensajePanel("", "");
+  ocupado("btn-crear", true);
+  try {
+    const r = await panelApi({ accion: "admin_crear", usuario, nombre });
+    document.getElementById("nuevo-usuario").value = "";
+    document.getElementById("nuevo-nombre").value  = "";
+    mostrarCredencial(r.usuario, r.contrasena, "Usuario creado.");
+    listarUsuarios();
+  } catch (e) {
+    mensajePanel(e.message, "err");
+  } finally {
+    ocupado("btn-crear", false, "Crear");
+  }
+}
+
+// Los botones de la tabla pasan el índice, no el nombre: interpolar
+// texto del usuario dentro de un onclick se rompe con una comilla.
+let usuariosPanel = [];
+
+async function nuevaClave(i) {
+  const usuario = (usuariosPanel[i] || {}).usuario;
+  if (!usuario) return;
+  if (!confirm("¿Generar una contraseña nueva para " + usuario + "?\n\n" +
+               "La actual deja de servir en ese momento.")) return;
+  mensajePanel("", "");
+  try {
+    const r = await panelApi({ accion: "admin_clave", usuario });
+    mostrarCredencial(r.usuario, r.contrasena, "Contraseña nueva.");
+    listarUsuarios();
+  } catch (e) {
+    mensajePanel(e.message, "err");
+  }
+}
+
+async function cambiarEstado(i, activar) {
+  const usuario = (usuariosPanel[i] || {}).usuario;
+  if (!usuario) return;
+  mensajePanel("", "");
+  try {
+    await panelApi({ accion: "admin_estado", usuario, activo: activar });
+    listarUsuarios();
+  } catch (e) {
+    mensajePanel(e.message, "err");
+  }
+}
+
+function fmtAcceso(iso) {
+  if (!iso) return "nunca";
+  const d = new Date(iso);
+  return isNaN(d) ? "—" : d.toLocaleDateString("es-BO");
+}
+
+async function listarUsuarios() {
+  const caja = document.getElementById("panel-lista");
+  caja.innerHTML = `<div class="status-msg"><span class="spinner"></span></div>`;
+  try {
+    const r = await panelApi({ accion: "admin_listar" });
+    usuariosPanel = r.usuarios;
+    const filas = r.usuarios.map((u, i) => `
+      <tr class="${u.activo ? "" : "inactivo"}">
+        <td>
+          <span class="usuario-clave">${escHtml(u.usuario)}</span>
+          ${u.admin ? '<span class="etiqueta-admin">admin</span>' : ""}
+        </td>
+        <td class="col-opcional">${escHtml(u.nombre)}</td>
+        <td class="col-opcional">${u.activo ? fmtAcceso(u.ultimo_acceso) : "desactivado"}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn-mini" onclick="nuevaClave(${i})">Nueva clave</button>
+          <button class="btn-mini" onclick="cambiarEstado(${i}, ${u.activo ? "false" : "true"})">
+            ${u.activo ? "Desactivar" : "Activar"}
+          </button>
+        </td>
+      </tr>`).join("");
+
+    caja.innerHTML = `
+      <table class="tabla-usuarios">
+        <thead><tr>
+          <th>Usuario</th>
+          <th class="col-opcional">Nombre</th>
+          <th class="col-opcional">Último ingreso</th>
+          <th></th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>`;
+  } catch (e) {
+    caja.innerHTML = `<div class="error-msg">${escHtml(e.message)}</div>`;
+  }
 }
 
 function iconoAdjunto() {
@@ -605,7 +843,7 @@ function renderGastos(gastos, pagos) {
     const comprobantes = adjuntos.length
       ? adjuntos.map(a =>
           `<a href="#" class="ext-link" onclick="verAdjunto(event,${a.id})"
-              title="${escHtml(a.nombre)}">${iconoAdjunto()} ${escHtml(nombreCorto(a.nombre))}</a>`
+              title="${escAttr(a.nombre)}">${iconoAdjunto()} ${escHtml(nombreCorto(a.nombre))}</a>`
         ).join(" ")
       : `<span class="sin-comprobante">sin comprobante</span>`;
 
@@ -706,6 +944,7 @@ async function cargar() {
   try {
     const json = await api({ accion: "datos", token: getToken() });
     if (!json.ok) throw new Error(json.error || "Error desconocido");
+    document.getElementById("btn-usuarios").classList.toggle("oculto", !json.es_admin);
     actualizarUI(json.data);
   } catch(e) {
     if (e.message === "DEBE_CAMBIAR") {

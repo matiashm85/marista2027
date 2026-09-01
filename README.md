@@ -49,7 +49,30 @@ Al entrar, el usuario recibe un token firmado que dura 30 días en
 
 `doGet` ya no devuelve datos — todo pasa por `POST` con token.
 
-### Dar de alta a la promoción
+### Panel de usuarios (lo normal)
+
+Los administradores ven un botón **Usuarios** en el encabezado del dashboard.
+Desde ahí se da de alta gente, se generan contraseñas nuevas y se activa o
+desactiva a alguien, sin tocar código ni la planilla.
+
+El alta genera siempre la contraseña y la muestra una sola vez para copiarla.
+Se guarda hasheada, así que no se puede volver a leer: si se pierde, se genera
+otra. Quien la recibe está obligado a cambiarla al entrar.
+
+El usuario se limpia solo: `Rodrigo.España` queda como `rodrigo.espana`. Los
+acentos son un problema real acá, porque una `ñ` se puede teclear de dos formas
+que se ven idénticas pero no son iguales para el código. Por eso el login
+también busca ignorando acentos: quien esté cargado con `ñ` entra igual.
+
+**Quién es administrador:** quien tenga `SI` en la columna `admin` de la
+planilla, o quien figure en la propiedad del script `ADMINS` (usuarios
+separados por coma). Esa propiedad es para dar de alta al primer admin y para
+recuperar el acceso si alguien se queda afuera.
+
+El permiso se relee en cada pedido, no se guarda en la sesión: si se lo sacás
+a alguien, deja de poder administrar en el acto aunque tenga la sesión abierta.
+
+### Dar de alta a la promoción (desde el editor)
 
 Desde el editor de Apps Script, elegir la función y darle a ejecutar:
 
@@ -84,9 +107,14 @@ en el primer ingreso antes de mostrarles nada.
 ### Administrar a mano
 
 La planilla se puede editar directo. La columna `activo` en `NO` bloquea a
-alguien; `debe_cambiar` en `SI` lo obliga a elegir contraseña nueva.
+alguien; `debe_cambiar` en `SI` lo obliga a elegir contraseña nueva; `admin`
+en `SI` le da acceso al panel de usuarios.
 No toques `hash` ni `salt`: si querés cambiarle la contraseña a alguien,
-usá `restablecerContrasena()`.
+usá el panel o `restablecerContrasena()`.
+
+Las columnas se pueden reordenar sin romper nada: el código busca cada una por
+su nombre en el encabezado, no por su posición. Si el encabezado le falta
+alguna, se agrega sola al final la próxima vez que el script toca la planilla.
 
 ## Publicar cambios
 

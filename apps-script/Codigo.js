@@ -47,7 +47,7 @@ const MAX_INTENTOS     = 8;      // intentos fallidos por usuario cada 15 min
 const ITERACIONES_HASH = 20000;  // estiramiento del hash (SHA-256 puro, barato)
 const LARGO_MINIMO     = 8;      // largo mínimo de contraseña
 const HOJA_USUARIOS    = "Usuarios";
-const COLUMNAS = ["usuario","nombre","hash","salt","activo","debe_cambiar","creado","ultimo_acceso"];
+const COLUMNAS = ["usuario","nombre","hash","salt","activo","debe_cambiar","admin","creado","ultimo_acceso"];
 
 // ------------------------------------------------------------
 //  Secreto de firma y pepper (se genera solo la primera vez)
@@ -245,7 +245,52 @@ function hojaUsuarios() {
     h.getRange(1, 1, 1, COLUMNAS.length).setFontWeight("bold");
   }
   _hoja = h;
+  _columnas = null;
+  agregarColumnasQueFalten(h);
   return h;
+}
+
+// Si el código gana una columna nueva, se agrega al encabezado de
+// las planillas que ya existían. Las filas viejas la ven vacía.
+function agregarColumnasQueFalten(h) {
+  const ancho = Math.max(h.getLastColumn(), 1);
+  const cab = h.getRange(1, 1, 1, ancho).getValues()[0]
+               .map(c => String(c).trim().toLowerCase());
+  while (cab.length && !cab[cab.length - 1]) cab.pop();
+
+  const faltan = COLUMNAS.filter(c => cab.indexOf(c) === -1);
+  if (!faltan.length) return;
+
+  h.getRange(1, cab.length + 1, 1, faltan.length).setValues([faltan]);
+  h.getRange(1, 1, 1, cab.length + faltan.length).setFontWeight("bold");
+}
+
+// Número de columna (base 1) según el encabezado REAL de la planilla.
+// Guiarse por la posición dentro de COLUMNAS sería frágil: si alguien
+// reordena las columnas a mano, escribiríamos el hash sobre otro campo.
+let _columnas = null;
+
+function colNum(nombre) {
+  if (!_columnas) {
+    const h = hojaUsuarios();
+    _columnas = {};
+    h.getRange(1, 1, 1, Math.max(h.getLastColumn(), 1)).getValues()[0]
+      .forEach((c, i) => {
+        const clave = String(c).trim().toLowerCase();
+        if (clave && !_columnas[clave]) _columnas[clave] = i + 1;
+      });
+  }
+  const n = _columnas[nombre];
+  if (!n) throw new Error("La planilla de usuarios no tiene la columna '" + nombre + "'.");
+  return n;
+}
+
+// Arma una fila nueva a partir de un objeto {columna: valor},
+// respetando el orden real del encabezado.
+function filaNueva(valores) {
+  const fila = new Array(Math.max(hojaUsuarios().getLastColumn(), COLUMNAS.length)).fill("");
+  Object.keys(valores).forEach(k => { fila[colNum(k) - 1] = valores[k]; });
+  return fila;
 }
 
 function leerUsuarios() {
@@ -265,11 +310,23 @@ function normalizarUsuario(valor) {
   return String(valor || "").trim().toLowerCase();
 }
 
+// Sin tildes ni eñes. Una "ñ" se puede teclear de dos formas que
+// se ven idénticas en pantalla pero no son iguales para el código;
+// esto hace que las dos lleven al mismo usuario.
+function sinAcentos(valor) {
+  return normalizarUsuario(valor).normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
 function buscarUsuario(usuario) {
   const clave = normalizarUsuario(usuario);
   if (!clave) return null;
-  const encontrados = leerUsuarios().filter(u => normalizarUsuario(u.usuario) === clave);
-  return encontrados.length ? encontrados[0] : null;
+  const todos = leerUsuarios();
+
+  const exacto = todos.filter(u => normalizarUsuario(u.usuario) === clave);
+  if (exacto.length) return exacto[0];
+
+  const aproximado = todos.filter(u => sinAcentos(u.usuario) === sinAcentos(clave));
+  return aproximado.length ? aproximado[0] : null;
 }
 
 function esSi(valor) {
@@ -281,9 +338,9 @@ function guardarContrasena(fila, contrasena, debeCambiar) {
   const salt = Utilities.getUuid();
   const h = hojaUsuarios();
   // hash y salt son columnas contiguas: una sola escritura
-  h.getRange(fila, COLUMNAS.indexOf("hash") + 1, 1, 2)
+  h.getRange(fila, colNum("hash"), 1, 2)
    .setValues([[hashContrasena(contrasena, salt), salt]]);
-  h.getRange(fila, COLUMNAS.indexOf("debe_cambiar") + 1).setValue(debeCambiar ? "SI" : "NO");
+  h.getRange(fila, colNum("debe_cambiar")).setValue(debeCambiar ? "SI" : "NO");
 }
 
 // ------------------------------------------------------------
@@ -308,7 +365,7 @@ function iniciarSesion(usuarioCrudo, contrasena) {
 
   limpiarLimite("login:" + usuario);
   hojaUsuarios()
-    .getRange(u._fila, COLUMNAS.indexOf("ultimo_acceso") + 1)
+    .getRange(u._fila, colNum("ultimo_acceso"))
     .setValue(new Date());
 
   const debeCambiar = esSi(u.debe_cambiar);
@@ -338,6 +395,101 @@ function cambiarContrasena(token, actual, nueva) {
 
   guardarContrasena(u._fila, nueva, false);
   return { ok: true, token: emitirToken(s.u, false), nombre: String(u.nombre || u.usuario) };
+}
+
+// ============================================================
+//  ADMINISTRADORES
+// ============================================================
+//  Es admin quien tenga SI en la columna "admin", o quien figure
+//  en la propiedad del script ADMINS (lista separada por comas).
+//  Esa propiedad existe para dos cosas: dar de alta al primer
+//  admin, y poder recuperar el acceso si alguien se queda afuera.
+// ============================================================
+function esAdmin(u) {
+  if (!u) return false;
+  if (esSi(u.admin)) return true;
+  return (PropertiesService.getScriptProperties().getProperty("ADMINS") || "")
+    .split(",").map(s => sinAcentos(s)).filter(Boolean)
+    .indexOf(sinAcentos(u.usuario)) !== -1;
+}
+
+// Valida la sesión Y que siga siendo admin. Se relee de la
+// planilla en cada pedido a propósito: si el permiso se saca,
+// tiene que dejar de valer al toque y no cuando venza el token.
+function sesionAdmin(token) {
+  const s = sesion(token);
+  if (s.c) throw new Error("DEBE_CAMBIAR");
+  const u = buscarUsuario(s.u);
+  if (!u || !esSi(u.activo)) throw new Error("SESION_INVALIDA");
+  if (!esAdmin(u)) throw new Error("No tenés permisos de administrador.");
+  return u;
+}
+
+function comoTexto(valor) {
+  if (valor instanceof Date) return valor.toISOString();
+  return valor ? String(valor) : "";
+}
+
+// Nunca devuelve hash ni salt.
+function adminListar() {
+  return {
+    ok: true,
+    usuarios: leerUsuarios().map(u => ({
+      usuario:       normalizarUsuario(u.usuario),
+      nombre:        String(u.nombre || ""),
+      activo:        esSi(u.activo),
+      debe_cambiar:  esSi(u.debe_cambiar),
+      admin:         esAdmin(u),
+      sin_clave:     !String(u.hash || "").trim(),
+      ultimo_acceso: comoTexto(u.ultimo_acceso)
+    }))
+  };
+}
+
+// Deja el usuario en minúsculas, sin tildes y sin caracteres raros,
+// para que quede igual que los que genera el alta desde Odoo.
+function limpiarUsuario(valor) {
+  return sinAcentos(valor).replace(/\s+/g, ".").replace(/[^a-z0-9._-]/g, "");
+}
+
+function adminCrear(usuarioCrudo, nombre, contrasena) {
+  const usuario = limpiarUsuario(usuarioCrudo);
+  if (!usuario) throw new Error("Escribí un usuario.");
+  if (usuario.length < 3) throw new Error("El usuario es demasiado corto.");
+  if (buscarUsuario(usuario)) throw new Error("Ya existe el usuario " + usuario + ".");
+
+  const pass = contrasena ? validarContrasena(contrasena) : contrasenaAlAzar();
+
+  const h = hojaUsuarios();
+  h.appendRow(filaNueva({
+    usuario:      usuario,
+    nombre:       String(nombre || "").trim() || usuario,
+    activo:       "SI",
+    debe_cambiar: "SI",          // siempre, aunque la elijas vos
+    admin:        "NO",
+    creado:       new Date()
+  }));
+  guardarContrasena(h.getLastRow(), pass, true);
+
+  return { ok: true, usuario: usuario, contrasena: pass };
+}
+
+function adminClave(usuarioCrudo) {
+  const u = buscarUsuario(usuarioCrudo);
+  if (!u) throw new Error("No existe ese usuario.");
+  const pass = contrasenaAlAzar();
+  guardarContrasena(u._fila, pass, true);
+  return { ok: true, usuario: normalizarUsuario(u.usuario), contrasena: pass };
+}
+
+function adminEstado(quienPide, usuarioCrudo, activo) {
+  const u = buscarUsuario(usuarioCrudo);
+  if (!u) throw new Error("No existe ese usuario.");
+  if (normalizarUsuario(u.usuario) === normalizarUsuario(quienPide.usuario)) {
+    throw new Error("No podés desactivarte a vos mismo.");
+  }
+  hojaUsuarios().getRange(u._fila, colNum("activo")).setValue(activo ? "SI" : "NO");
+  return { ok: true, usuario: normalizarUsuario(u.usuario), activo: !!activo };
 }
 
 // ------------------------------------------------------------
@@ -406,7 +558,10 @@ function crearUsuario(usuario, nombre, contrasena) {
   const pass = contrasena ? validarContrasena(contrasena) : contrasenaAlAzar();
 
   const h = hojaUsuarios();
-  h.appendRow([clave, nombre || clave, "", "", "SI", generada ? "SI" : "NO", new Date(), ""]);
+  h.appendRow(filaNueva({
+    usuario: clave, nombre: nombre || clave, activo: "SI",
+    debe_cambiar: generada ? "SI" : "NO", admin: "NO", creado: new Date()
+  }));
   guardarContrasena(h.getLastRow(), pass, generada);
 
   Logger.log("Usuario: " + clave + "   Contraseña: " + pass);
@@ -443,8 +598,11 @@ function crearUsuariosDesdeOdoo() {
     const usuario = usuarioDesdeNombre(p.nombre, tomados);
     const pass    = contrasenaAlAzar();
     const salt    = Utilities.getUuid();
-    filas.push([usuario, p.nombre, hashContrasena(pass, salt), salt,
-                "SI", "SI", new Date(), ""]);
+    filas.push(filaNueva({
+      usuario: usuario, nombre: p.nombre,
+      hash: hashContrasena(pass, salt), salt: salt,
+      activo: "SI", debe_cambiar: "SI", admin: "NO", creado: new Date()
+    }));
     yaTienen.push(clave);
     cambios.push({ nombre: p.nombre, usuario: usuario, contrasena: pass, nota: "nuevo" });
   });
@@ -512,14 +670,14 @@ function restablecerContrasena(usuario) {
 function desactivarUsuario(usuario) {
   const u = buscarUsuario(usuario);
   if (!u) throw new Error("No existe el usuario " + usuario);
-  hojaUsuarios().getRange(u._fila, COLUMNAS.indexOf("activo") + 1).setValue("NO");
+  hojaUsuarios().getRange(u._fila, colNum("activo")).setValue("NO");
   Logger.log("Desactivado: " + normalizarUsuario(u.usuario));
 }
 
 function activarUsuario(usuario) {
   const u = buscarUsuario(usuario);
   if (!u) throw new Error("No existe el usuario " + usuario);
-  hojaUsuarios().getRange(u._fila, COLUMNAS.indexOf("activo") + 1).setValue("SI");
+  hojaUsuarios().getRange(u._fila, colNum("activo")).setValue("SI");
   Logger.log("Activado: " + normalizarUsuario(u.usuario));
 }
 
@@ -650,7 +808,29 @@ function doPost(e) {
       case "datos": {
         const s = sesion(req.token);
         if (s.c) throw new Error("DEBE_CAMBIAR");
-        return respuestaJson({ ok: true, usuario: s.u, data: obtenerDatos() });
+        return respuestaJson({
+          ok: true,
+          usuario: s.u,
+          es_admin: esAdmin(buscarUsuario(s.u)),
+          data: obtenerDatos()
+        });
+      }
+
+      case "admin_listar":
+        sesionAdmin(req.token);
+        return respuestaJson(adminListar());
+
+      case "admin_crear":
+        sesionAdmin(req.token);
+        return respuestaJson(adminCrear(req.usuario, req.nombre, req.contrasena));
+
+      case "admin_clave":
+        sesionAdmin(req.token);
+        return respuestaJson(adminClave(req.usuario));
+
+      case "admin_estado": {
+        const quien = sesionAdmin(req.token);
+        return respuestaJson(adminEstado(quien, req.usuario, !!req.activo));
       }
 
       case "adjunto": {
